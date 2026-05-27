@@ -1,0 +1,16 @@
+.DS_Store
+build/
+
+# Local profile data should never be committed.
+CodexAccountSwitcher/
+
+# Swift and Xcode local state
+.build/
+DerivedData/
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Logs and temporary files
+*.log
+*.tmp
