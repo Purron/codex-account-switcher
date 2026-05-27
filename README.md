@@ -15,7 +15,7 @@ It is useful when you regularly move between personal, work, or team Codex accou
 - Save the active profile before switching away
 - Restore `~/.codex/auth.json` for Codex CLI
 - Restore `~/Library/Application Support/Codex` for Codex Desktop
-- Show optional 5-hour and weekly quota remaining percentages from CodexBar history
+- Show each saved profile's 5h and 1w Codex usage remaining from the official Codex usage endpoint
 - Keep all profile data on your machine
 
 ## Project Structure
@@ -36,13 +36,7 @@ It is useful when you regularly move between personal, work, or team Codex accou
 - Codex CLI, with at least one account already signed in
 - Swift compiler, usually provided by Xcode Command Line Tools
 
-Quota display is optional. If you use CodexBar, this app reads its history file:
-
-```text
-~/Library/Application Support/com.steipete.codexbar/history/codex.json
-```
-
-If the file is not available, account switching still works and quota fields show `--`.
+This app does not read files owned by other apps. Usage display reads each saved profile's own Codex `auth.json`, calls Codex's official `https://chatgpt.com/backend-api/wham/usage` endpoint, and stores only a small cache under `~/Library/Application Support/CodexAccountSwitcher/usage-cache.json`.
 
 ## Quick Start
 
@@ -85,20 +79,15 @@ chmod +x build-app.sh codex-account-switcher.sh
 open "build/Codex Account Switcher.app"
 ```
 
-After launch, the menu bar item shows the current account's 5-hour quota remaining percentage, such as `52%`.
+After launch, the menu bar item shows the switcher icon and the current profile's 5h remaining usage percentage.
 
 From the menu, you can:
 
 - Switch to a saved profile
+- View 5h and 1w remaining usage plus each reset time for every profile
 - Capture the current Codex account as a new profile
-- Refresh quota display
 - Open the profile data folder
 - Open Codex
-
-Each profile submenu can show:
-
-- 5-hour remaining percentage, reset time, and last update time
-- Weekly remaining percentage, reset time, and last update time
 
 ## Data Location
 
@@ -173,7 +162,7 @@ Codex Account Switcher 会保存每个 profile 对应的 Codex CLI 登录态和 
 - 切换前自动保存当前 profile 的最新 Codex 状态
 - 恢复 Codex CLI 的 `~/.codex/auth.json`
 - 恢复 Codex Desktop 的 `~/Library/Application Support/Codex`
-- 可选展示 CodexBar 记录的 5 小时和 1 周额度剩余百分比
+- 通过 Codex 官方用量接口展示每个已保存 profile 的 5 小时和 1 周剩余额度
 - 所有 profile 数据都保存在本机
 
 ## 项目结构
@@ -194,13 +183,7 @@ Codex Account Switcher 会保存每个 profile 对应的 Codex CLI 登录态和 
 - 已安装 Codex CLI，并至少登录过一个账号
 - Swift 编译器，通常随 Xcode Command Line Tools 提供
 
-额度展示是可选能力。如果你安装并使用了 CodexBar，本工具会读取它的历史文件：
-
-```text
-~/Library/Application Support/com.steipete.codexbar/history/codex.json
-```
-
-没有该文件时，账号切换仍然可用，额度位置会显示 `--`。
+本工具不会读取其他 App 的私有文件。用量展示只读取每个 profile 自己保存的 Codex `auth.json`，请求 Codex 官方的 `https://chatgpt.com/backend-api/wham/usage` 接口，并且只把剩余百分比、reset 时间和更新时间缓存到 `~/Library/Application Support/CodexAccountSwitcher/usage-cache.json`。
 
 ## 快速开始
 
@@ -243,20 +226,15 @@ chmod +x build-app.sh codex-account-switcher.sh
 open "build/Codex Account Switcher.app"
 ```
 
-打开后，菜单栏会显示当前账号的 5 小时额度剩余百分比，例如 `52%`。
+打开后，菜单栏会显示切换器图标和当前 profile 的 5 小时剩余额度百分比。
 
 点击菜单栏图标可以：
 
 - 切换到已保存的 profile
+- 查看每个 profile 的 5 小时和 1 周剩余额度，以及各自 reset 时间
 - 捕获当前 Codex 账号为新 profile
-- 刷新额度展示
 - 打开 profile 数据目录
 - 打开 Codex
-
-每个 profile 的子菜单会展示：
-
-- 5 小时剩余百分比、刷新时间、最近更新时间
-- 1 周剩余百分比、刷新时间、最近更新时间
 
 ## 数据保存位置
 
