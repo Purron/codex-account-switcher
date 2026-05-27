@@ -1,18 +1,180 @@
 # Codex Account Switcher
 
+**English** | [简体中文](#简体中文)
+
+A local-first macOS menu bar app for switching between multiple OpenAI Codex accounts.
+
+Codex Account Switcher saves the Codex CLI auth state and Codex Desktop app state for each profile. When you switch profiles, it quits Codex, restores the selected account state, and opens Codex again.
+
+It is useful when you regularly move between personal, work, or team Codex accounts.
+
+## Features
+
+- Switch Codex accounts from the macOS menu bar
+- Capture the currently signed-in Codex account as a local profile
+- Save the active profile before switching away
+- Restore `~/.codex/auth.json` for Codex CLI
+- Restore `~/Library/Application Support/Codex` for Codex Desktop
+- Show optional 5-hour and weekly quota remaining percentages from CodexBar history
+- Keep all profile data on your machine
+
+## Project Structure
+
+```text
+.
+├── CodexAccountSwitcher.swift     # macOS menu bar app source
+├── codex-account-switcher.sh      # Account capture and switch script
+├── build-app.sh                   # Local build script
+├── resources/                     # App icons and Info.plist
+└── README.md
+```
+
+## Requirements
+
+- macOS
+- OpenAI Codex Desktop App
+- Codex CLI, with at least one account already signed in
+- Swift compiler, usually provided by Xcode Command Line Tools
+
+Quota display is optional. If you use CodexBar, this app reads its history file:
+
+```text
+~/Library/Application Support/com.steipete.codexbar/history/codex.json
+```
+
+If the file is not available, account switching still works and quota fields show `--`.
+
+## Quick Start
+
+Sign in to your first Codex account, then run:
+
+```bash
+./codex-account-switcher.sh capture personal
+```
+
+Sign out and sign in to your second Codex account, then run:
+
+```bash
+./codex-account-switcher.sh capture work
+```
+
+Switch between profiles:
+
+```bash
+./codex-account-switcher.sh switch personal
+./codex-account-switcher.sh switch work
+```
+
+List saved profiles:
+
+```bash
+./codex-account-switcher.sh list
+```
+
+Show the active profile:
+
+```bash
+./codex-account-switcher.sh active
+```
+
+## Build the Menu Bar App
+
+```bash
+chmod +x build-app.sh codex-account-switcher.sh
+./build-app.sh
+open "build/Codex Account Switcher.app"
+```
+
+After launch, the menu bar item shows the current account's 5-hour quota remaining percentage, such as `52%`.
+
+From the menu, you can:
+
+- Switch to a saved profile
+- Capture the current Codex account as a new profile
+- Refresh quota display
+- Open the profile data folder
+- Open Codex
+
+Each profile submenu can show:
+
+- 5-hour remaining percentage, reset time, and last update time
+- Weekly remaining percentage, reset time, and last update time
+
+## Data Location
+
+Profiles are saved locally in:
+
+```text
+~/Library/Application Support/CodexAccountSwitcher
+```
+
+Each profile uses this structure:
+
+```text
+profiles/<name>/auth/auth.json
+profiles/<name>/app-support/Codex
+profiles/<name>/profile.env
+```
+
+## Security Notes
+
+This tool only copies Codex auth and desktop state files on your local machine. It does not read, print, or upload token contents.
+
+Be careful with profile data. `~/Library/Application Support/Codex` may contain cookies, Local Storage, window state, and other desktop app state. Do not commit profile data to GitHub or share it with anyone else.
+
+Codex Desktop must be restarted when switching accounts. Electron and Chromium auth state does not hot-reload while the app is running, so this tool quits Codex before capture and switch operations.
+
+## CLI Reference
+
+```text
+codex-account-switcher.sh capture <profile>
+codex-account-switcher.sh switch <profile> [--no-open]
+codex-account-switcher.sh list [--plain]
+codex-account-switcher.sh active
+codex-account-switcher.sh open-folder
+```
+
+Environment variables:
+
+```text
+SWITCHER_HOME       Profile storage directory
+CODEX_AUTH_FILE     Codex CLI auth file, default ~/.codex/auth.json
+CODEX_APP_SUPPORT   Codex Desktop state directory, default ~/Library/Application Support/Codex
+CODEX_APP_NAME      macOS app name, default Codex
+```
+
+## Recapturing Old Profiles
+
+If you captured profiles with an older version, sign in to each account again and capture it with the same profile name:
+
+```bash
+./codex-account-switcher.sh capture personal
+./codex-account-switcher.sh capture work
+```
+
+This keeps `auth.json` and Codex Desktop state in the latest format.
+
+---
+
+# 简体中文
+
+[English](#codex-account-switcher) | **简体中文**
+
 一个本地优先的 macOS 菜单栏工具，用来在多个 OpenAI Codex 账号之间快速切换。
 
-它会保存每个账号对应的 Codex CLI 登录态和 Codex Desktop 应用状态，切换时自动退出 Codex、恢复目标账号状态并重新打开 Codex。适合同时使用个人账号、工作账号或不同团队账号的场景。
+Codex Account Switcher 会保存每个 profile 对应的 Codex CLI 登录态和 Codex Desktop 应用状态。切换 profile 时，它会自动退出 Codex、恢复目标账号状态，并重新打开 Codex。
+
+适合同时使用个人账号、工作账号或不同团队账号的场景。
 
 ## 功能特性
 
-- 菜单栏快速切换 Codex 账号
-- 捕获当前 Codex 登录态为一个本地 profile
-- 自动保存当前 profile 的最新 Codex 状态
-- 切换时恢复 `~/.codex/auth.json`
-- 切换时恢复 `~/Library/Application Support/Codex`
-- 支持展示 CodexBar 记录的 5 小时和 1 周额度剩余百分比
-- 所有 profile 数据都保存在本机，不上传到任何服务
+- 从 macOS 菜单栏快速切换 Codex 账号
+- 捕获当前 Codex 登录态为本地 profile
+- 切换前自动保存当前 profile 的最新 Codex 状态
+- 恢复 Codex CLI 的 `~/.codex/auth.json`
+- 恢复 Codex Desktop 的 `~/Library/Application Support/Codex`
+- 可选展示 CodexBar 记录的 5 小时和 1 周额度剩余百分比
+- 所有 profile 数据都保存在本机
 
 ## 项目结构
 
@@ -42,13 +204,13 @@
 
 ## 快速开始
 
-先登录第一个 Codex 账号，然后在项目目录执行：
+先登录第一个 Codex 账号，然后执行：
 
 ```bash
 ./codex-account-switcher.sh capture personal
 ```
 
-再用你的常规方式退出当前 Codex 账号并登录第二个账号，然后执行：
+再退出当前 Codex 账号并登录第二个账号，然后执行：
 
 ```bash
 ./codex-account-switcher.sh capture work
@@ -81,7 +243,9 @@ chmod +x build-app.sh codex-account-switcher.sh
 open "build/Codex Account Switcher.app"
 ```
 
-打开后，菜单栏会显示状态图标和当前账号的 5 小时额度剩余百分比，例如 `52%`。点击菜单栏图标可以：
+打开后，菜单栏会显示当前账号的 5 小时额度剩余百分比，例如 `52%`。
+
+点击菜单栏图标可以：
 
 - 切换到已保存的 profile
 - 捕获当前 Codex 账号为新 profile
@@ -137,7 +301,7 @@ CODEX_APP_SUPPORT   Codex Desktop 状态目录，默认 ~/Library/Application Su
 CODEX_APP_NAME      macOS App 名称，默认 Codex
 ```
 
-## 重新捕获旧 profile
+## 重新捕获旧 Profile
 
 如果你用旧版本捕获过 profile，建议重新登录每个账号后用同名 profile 捕获一次：
 
