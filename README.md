@@ -2,6 +2,14 @@
 
 **English** | [简体中文](#简体中文)
 
+## Download
+
+**Latest macOS app:** [CodexAccountSwitcher-v0.1.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.1.0/CodexAccountSwitcher-v0.1.0-macOS.zip)
+
+All downloads are available on the [GitHub Releases page](https://github.com/Purron/codex-account-switcher/releases).
+
+> Note: the current build is not Apple notarized yet. On first launch, macOS may require opening it via right click -> Open or allowing it in Privacy & Security.
+
 A local-first macOS menu bar app for switching between multiple OpenAI Codex accounts.
 
 Codex Account Switcher saves the Codex CLI auth state and Codex Desktop app state for each profile. When you switch profiles, it quits Codex, restores the selected account state, and opens Codex again.
@@ -148,6 +156,14 @@ This keeps `auth.json` and Codex Desktop state in the latest format.
 # 简体中文
 
 [English](#codex-account-switcher) | **简体中文**
+
+## 下载
+
+**最新版 macOS App：** [CodexAccountSwitcher-v0.1.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.1.0/CodexAccountSwitcher-v0.1.0-macOS.zip)
+
+所有版本都可以在 [GitHub Releases 页面](https://github.com/Purron/codex-account-switcher/releases) 下载。
+
+> 注意：当前版本还没有经过 Apple notarize。首次打开时，macOS 可能需要你右键 App 选择 Open，或在 Privacy & Security 里允许打开。
 
 一个本地优先的 macOS 菜单栏工具，用来在多个 OpenAI Codex 账号之间快速切换。
 
