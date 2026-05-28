@@ -4,7 +4,7 @@
 
 ## Download
 
-**Latest macOS app:** [CodexAccountSwitcher-v0.1.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.1.0/CodexAccountSwitcher-v0.1.0-macOS.zip)
+**Latest macOS app:** [CodexAccountSwitcher-v0.2.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.2.0/CodexAccountSwitcher-v0.2.0-macOS.zip)
 
 All downloads are available on the [GitHub Releases page](https://github.com/Purron/codex-account-switcher/releases).
 
@@ -164,7 +164,7 @@ This keeps `auth.json` and Codex Desktop state in the latest format.
 
 ## 下载
 
-**最新版 macOS App：** [CodexAccountSwitcher-v0.1.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.1.0/CodexAccountSwitcher-v0.1.0-macOS.zip)
+**最新版 macOS App：** [CodexAccountSwitcher-v0.2.0-macOS.zip](https://github.com/Purron/codex-account-switcher/releases/download/v0.2.0/CodexAccountSwitcher-v0.2.0-macOS.zip)
 
 所有版本都可以在 [GitHub Releases 页面](https://github.com/Purron/codex-account-switcher/releases) 下载。
 
