@@ -64,6 +64,465 @@ struct UsageSnapshot: Codable {
     let error: String?
 }
 
+private struct UsageBarRow {
+    let title: String
+    let usedPercent: Double?
+    let resetText: String
+}
+
+private struct ProfileTabItem {
+    let profile: String
+    let subtitle: String
+    let isActive: Bool
+}
+
+private final class MenuHeaderView: NSView {
+    private let icon: NSImage?
+    private let titleText: String
+    private static let menuWidth: CGFloat = 280
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: Self.menuWidth, height: 34)
+    }
+
+    init(icon: NSImage?, title: String) {
+        self.icon = icon
+        self.titleText = title
+        super.init(frame: NSRect(origin: .zero, size: NSSize(width: Self.menuWidth, height: 34)))
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        if let icon {
+            let iconY = max(0, (bounds.height - 16) / 2)
+            icon.draw(in: NSRect(x: 16, y: iconY, width: 16, height: 16))
+        }
+
+        let attributes = textAttributes(
+            font: .systemFont(ofSize: 12, weight: .medium),
+            color: .labelColor
+        )
+        let attributedTitle = NSAttributedString(string: titleText, attributes: attributes)
+        let textSize = attributedTitle.size()
+        let textY = max(0, (bounds.height - textSize.height) / 2)
+        attributedTitle.draw(at: NSPoint(x: 36, y: textY))
+    }
+
+    private func textAttributes(font: NSFont, color: NSColor) -> [NSAttributedString.Key: Any] {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        return [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraphStyle
+        ]
+    }
+
+    private func drawText(_ text: String, in rect: NSRect, attributes: [NSAttributedString.Key: Any]) {
+        (text as NSString).draw(
+            with: rect,
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes
+        )
+    }
+}
+
+private final class PlainTextButton: NSButton {
+    private let textColor: NSColor
+
+    init(title: String, frame: NSRect, textColor: NSColor, target: AnyObject?, action: Selector?) {
+        self.textColor = textColor
+        super.init(frame: frame)
+        self.title = title
+        self.target = target
+        self.action = action
+        isBordered = false
+        focusRingType = .none
+        setButtonType(.momentaryChange)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font ?? .systemFont(ofSize: 10, weight: .medium),
+            .foregroundColor: textColor
+        ]
+        (title as NSString).draw(
+            with: bounds,
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes
+        )
+    }
+}
+
+private final class ProfileTabButton: NSButton {
+    let profile: String
+    private let subtitle: String
+    private let isActiveProfile: Bool
+    private var isHovered = false
+    private var hoverTrackingArea: NSTrackingArea?
+
+    init(item: ProfileTabItem, frame: NSRect, target: AnyObject?, action: Selector?) {
+        self.profile = item.profile
+        self.subtitle = item.subtitle
+        self.isActiveProfile = item.isActive
+        super.init(frame: frame)
+        self.target = target
+        self.action = action
+        isBordered = false
+        focusRingType = .none
+        setButtonType(.momentaryChange)
+        isEnabled = !item.isActive
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard !isActiveProfile else { return }
+        isHovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard !isActiveProfile else { return }
+        isHovered = false
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let backgroundAlpha: CGFloat = isHovered ? 0.10 : 0.05
+        let backgroundColor = isActiveProfile ? NSColor.systemBlue : NSColor.labelColor.withAlphaComponent(backgroundAlpha)
+        backgroundColor.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4).fill()
+
+        let titleColor = isActiveProfile ? NSColor.white : NSColor.labelColor.withAlphaComponent(0.85)
+        let subtitleColor = isActiveProfile ? NSColor.white.withAlphaComponent(0.55) : NSColor.labelColor.withAlphaComponent(0.45)
+        let titleRect = NSRect(x: 8, y: 4, width: bounds.width - 16, height: 18)
+        let subtitleRect = NSRect(x: 8, y: 22, width: bounds.width - 16, height: 14)
+
+        drawText(
+            profile,
+            in: titleRect,
+            attributes: textAttributes(font: .systemFont(ofSize: 14, weight: .medium), color: titleColor)
+        )
+        drawText(
+            subtitle,
+            in: subtitleRect,
+            attributes: textAttributes(font: .systemFont(ofSize: 10, weight: .medium), color: subtitleColor)
+        )
+    }
+
+    private func textAttributes(font: NSFont, color: NSColor) -> [NSAttributedString.Key: Any] {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        return [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraphStyle
+        ]
+    }
+
+    private func drawText(_ text: String, in rect: NSRect, attributes: [NSAttributedString.Key: Any]) {
+        (text as NSString).draw(
+            with: rect,
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes
+        )
+    }
+}
+
+private final class AddAccountButton: NSButton {
+    private var isHovered = false
+    private var hoverTrackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        isBordered = false
+        focusRingType = .none
+        setButtonType(.momentaryChange)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.labelColor.withAlphaComponent(isHovered ? 0.10 : 0.05).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4).fill()
+
+        NSColor.secondaryLabelColor.setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 1.8
+        path.lineCapStyle = .round
+        path.move(to: NSPoint(x: bounds.midX - 4, y: bounds.midY))
+        path.line(to: NSPoint(x: bounds.midX + 4, y: bounds.midY))
+        path.move(to: NSPoint(x: bounds.midX, y: bounds.midY - 4))
+        path.line(to: NSPoint(x: bounds.midX, y: bounds.midY + 4))
+        path.stroke()
+    }
+}
+
+private final class ProfileTabsMenuView: NSView {
+    private static let menuWidth: CGFloat = 280
+    private static let horizontalPadding: CGFloat = 16
+    private static let tabWidth: CGFloat = 64
+    private static let addButtonWidth: CGFloat = 40
+    private static let gap: CGFloat = 6
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: Self.menuWidth, height: 50)
+    }
+
+    init(items: [ProfileTabItem], target: AnyObject?, switchAction: Selector, addAction: Selector) {
+        super.init(frame: NSRect(origin: .zero, size: NSSize(width: Self.menuWidth, height: 50)))
+
+        var x = Self.horizontalPadding
+        for item in items {
+            let button = ProfileTabButton(
+                item: item,
+                frame: NSRect(x: x, y: 0, width: Self.tabWidth, height: 40),
+                target: target,
+                action: item.isActive ? nil : switchAction
+            )
+            addSubview(button)
+            x += Self.tabWidth + Self.gap
+        }
+
+        let addButton = AddAccountButton(frame: NSRect(x: x, y: 0, width: Self.addButtonWidth, height: 40))
+        addButton.target = target
+        addButton.action = addAction
+        addSubview(addButton)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+}
+
+private final class UsageBarsMenuView: NSView {
+    private static let menuWidth: CGFloat = 280
+    private static let horizontalPadding: CGFloat = 16
+    private static let topPadding: CGFloat = 0
+    private static let rowHeight: CGFloat = 50
+    private static let footerHeight: CGFloat = 18
+    private static let barHeight: CGFloat = 6
+    private static let refreshTitle = "Refresh now"
+    private static let footerGap: CGFloat = 4
+
+    private let rows: [UsageBarRow]
+    private let updatedText: String
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(
+            width: Self.menuWidth,
+            height: Self.topPadding + CGFloat(rows.count) * Self.rowHeight + Self.footerHeight
+        )
+    }
+
+    init(rows: [UsageBarRow], updatedText: String, target: AnyObject?, refreshAction: Selector) {
+        self.rows = rows
+        self.updatedText = updatedText
+        let initialSize = NSSize(
+            width: Self.menuWidth,
+            height: Self.topPadding + CGFloat(rows.count) * Self.rowHeight + Self.footerHeight
+        )
+        super.init(frame: NSRect(origin: .zero, size: initialSize))
+
+        let footerFont = NSFont.systemFont(ofSize: 10, weight: .medium)
+        let updatedWidth = Self.updatedTextWidth(updatedText, font: footerFont)
+        let refreshWidth = Self.textWidth(Self.refreshTitle, font: footerFont)
+        let refreshButton = PlainTextButton(
+            title: Self.refreshTitle,
+            frame: NSRect(
+                x: Self.horizontalPadding + updatedWidth + Self.footerGap,
+                y: Self.topPadding + CGFloat(rows.count) * Self.rowHeight + 3,
+                width: refreshWidth + 2,
+                height: 14
+            ),
+            textColor: .labelColor,
+            target: target,
+            action: refreshAction
+        )
+        refreshButton.font = footerFont
+        addSubview(refreshButton)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let titleAttributes = textAttributes(
+            font: .systemFont(ofSize: 12, weight: .medium),
+            color: .labelColor
+        )
+        let valueAttributes = textAttributes(
+            font: .systemFont(ofSize: 10, weight: .medium),
+            color: .labelColor.withAlphaComponent(0.65)
+        )
+        let resetAttributes = textAttributes(
+            font: .systemFont(ofSize: 10, weight: .medium),
+            color: .labelColor.withAlphaComponent(0.65),
+            alignment: .right
+        )
+        let footerAttributes = textAttributes(
+            font: .systemFont(ofSize: 10, weight: .medium),
+            color: .labelColor.withAlphaComponent(0.45)
+        )
+        let trackColor = NSColor.labelColor.withAlphaComponent(0.05)
+        let fillColor = NSColor(calibratedRed: 252 / 255, green: 121 / 255, blue: 32 / 255, alpha: 1)
+
+        for (index, row) in rows.enumerated() {
+            let y = Self.topPadding + CGFloat(index) * Self.rowHeight
+            drawText(row.title, in: NSRect(x: Self.horizontalPadding, y: y, width: Self.menuWidth - Self.horizontalPadding * 2, height: 18), attributes: titleAttributes)
+
+            let trackRect = NSRect(
+                x: Self.horizontalPadding,
+                y: y + 22,
+                width: Self.menuWidth - Self.horizontalPadding * 2,
+                height: Self.barHeight
+            )
+            trackColor.setFill()
+            NSBezierPath(roundedRect: trackRect, xRadius: Self.barHeight / 2, yRadius: Self.barHeight / 2).fill()
+
+            let percent = clampedPercent(row.usedPercent)
+            if percent > 0 {
+                let fillWidth = max(Self.barHeight, trackRect.width * CGFloat(percent / 100))
+                let fillRect = NSRect(x: trackRect.minX, y: trackRect.minY, width: min(fillWidth, trackRect.width), height: trackRect.height)
+                fillColor.setFill()
+                NSBezierPath(roundedRect: fillRect, xRadius: Self.barHeight / 2, yRadius: Self.barHeight / 2).fill()
+            }
+
+            let textY = y + 32
+            let halfWidth = (Self.menuWidth - Self.horizontalPadding * 2) / 2
+            drawText(
+                "\(formatPercent(row.usedPercent)) used",
+                in: NSRect(x: Self.horizontalPadding, y: textY, width: halfWidth, height: 18),
+                attributes: valueAttributes
+            )
+            drawText(
+                row.resetText,
+                in: NSRect(x: Self.horizontalPadding + halfWidth, y: textY, width: halfWidth, height: 18),
+                attributes: resetAttributes
+            )
+        }
+
+        let footerY = Self.topPadding + CGFloat(rows.count) * Self.rowHeight
+        let footerFont = NSFont.systemFont(ofSize: 10, weight: .medium)
+        drawText(
+            updatedText,
+            in: NSRect(
+                x: Self.horizontalPadding,
+                y: footerY + 3,
+                width: Self.updatedTextWidth(updatedText, font: footerFont),
+                height: 16
+            ),
+            attributes: footerAttributes
+        )
+    }
+
+    private static func updatedTextWidth(_ text: String, font: NSFont) -> CGFloat {
+        let availableWidth = menuWidth - horizontalPadding * 2 - footerGap - textWidth(refreshTitle, font: font)
+        return min(textWidth(text, font: font), availableWidth)
+    }
+
+    private static func textWidth(_ text: String, font: NSFont) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    private func clampedPercent(_ value: Double?) -> Double {
+        guard let value, value.isFinite else { return 0 }
+        return min(max(value, 0), 100)
+    }
+
+    private func formatPercent(_ value: Double?) -> String {
+        guard let value, value.isFinite else { return "--%" }
+        return "\(Int(min(max(value, 0), 100).rounded()))%"
+    }
+
+    private func textAttributes(font: NSFont, color: NSColor, alignment: NSTextAlignment = .left) -> [NSAttributedString.Key: Any] {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+
+        return [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraphStyle
+        ]
+    }
+
+    private func drawText(_ text: String, in rect: NSRect, attributes: [NSAttributedString.Key: Any]) {
+        (text as NSString).draw(
+            with: rect,
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes
+        )
+    }
+}
+
 final class UsageFetcher {
     private let endpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
 
@@ -194,30 +653,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func rebuildMenu() {
         let menu = NSMenu()
+        menu.autoenablesItems = false
         let active = activeProfile()
         let profiles = profileNames()
 
-        if profiles.isEmpty {
-            let item = NSMenuItem(title: "No profiles yet", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
+        addCustomView(MenuHeaderView(icon: statusIcon(size: 16), title: "CodeX Account Switcher"), to: menu)
+
+        if profiles.count > 3 {
+            addAccountsOverflowItem(to: menu, profiles: profiles, activeProfile: active)
         } else {
-            for profile in profiles {
-                let item = NSMenuItem(title: profileTitle(profile: profile), action: nil, keyEquivalent: "")
-                item.state = profile == active ? .on : .off
-                item.submenu = profileSubmenu(profile: profile, isActive: profile == active)
-                menu.addItem(item)
-            }
+            addCustomView(
+                ProfileTabsMenuView(
+                    items: profileTabItems(profiles: profiles, activeProfile: active),
+                    target: self,
+                    switchAction: #selector(switchProfileButton(_:)),
+                    addAction: #selector(captureCurrent)
+                ),
+                to: menu
+            )
+        }
+
+        if !active.isEmpty {
+            addUsageItems(to: menu, snapshot: usageByProfile[active])
         }
 
         menu.addItem(.separator())
-        menu.addItem(makeItem(title: "Capture Current Account...", action: #selector(captureCurrent)))
-        menu.addItem(makeItem(title: isRefreshingUsage ? "Refreshing Usage..." : "Refresh Usage", action: #selector(refreshNow), keyEquivalent: "r"))
+        menu.addItem(makeItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "o"))
         menu.addItem(.separator())
-        menu.addItem(makeItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder)))
-        menu.addItem(makeItem(title: "Open Codex", action: #selector(openCodex), keyEquivalent: "o"))
-        menu.addItem(.separator())
-        menu.addItem(makeItem(title: "Quit Switcher", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(makeItem(title: "Quit Switch", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem.menu = menu
         updateStatusBarTitle(activeProfile: active)
@@ -226,31 +689,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeItem(title: String, action: Selector, keyEquivalent: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
         item.target = self
+        if !keyEquivalent.isEmpty {
+            item.keyEquivalentModifierMask = [.command]
+        }
         return item
     }
 
-    private func profileSubmenu(profile: String, isActive: Bool) -> NSMenu {
+    private func addCustomView(_ view: NSView, to menu: NSMenu) {
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.view = view
+        menu.addItem(item)
+    }
+
+    private func addAccountsOverflowItem(to menu: NSMenu, profiles: [String], activeProfile: String) {
+        let title = activeProfile.isEmpty ? "Accounts" : "Accounts  \(activeProfile)"
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.submenu = accountsSubmenu(profiles: profiles, activeProfile: activeProfile)
+        menu.addItem(item)
+    }
+
+    private func accountsSubmenu(profiles: [String], activeProfile: String) -> NSMenu {
         let submenu = NSMenu()
 
-        addUsageItems(to: submenu, snapshot: usageByProfile[profile])
-        submenu.addItem(.separator())
+        for profile in profiles {
+            let item = NSMenuItem(title: "\(profile)  \(profileSubtitle(profile))", action: #selector(switchProfile(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = profile
+            item.state = profile == activeProfile ? .on : .off
+            item.isEnabled = profile != activeProfile
+            submenu.addItem(item)
+        }
 
-        let switchTitle = isActive ? "Current Account" : "Switch to \(profile)"
-        let switchItem = NSMenuItem(title: switchTitle, action: #selector(switchProfile(_:)), keyEquivalent: "")
-        switchItem.target = self
-        switchItem.representedObject = profile
-        switchItem.isEnabled = !isActive
-        submenu.addItem(switchItem)
+        submenu.addItem(.separator())
+        submenu.addItem(makeItem(title: "Add Account...", action: #selector(captureCurrent)))
 
         return submenu
     }
 
     private func configureStatusItemIcon() {
         guard let button = statusItem.button else { return }
-        if let url = Bundle.main.url(forResource: "StatusIcon", withExtension: "png"),
-           let image = NSImage(contentsOf: url) {
-            image.size = NSSize(width: 18, height: 18)
-            image.isTemplate = true
+        if let image = statusIcon(size: 18) {
             button.image = image
             button.imagePosition = .imageLeft
             button.title = ""
@@ -260,9 +738,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func statusIcon(size: CGFloat) -> NSImage? {
+        if let url = Bundle.main.url(forResource: "StatusIcon", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            image.size = NSSize(width: size, height: size)
+            image.isTemplate = true
+            return image
+        }
+        return nil
+    }
+
     @objc private func switchProfile(_ sender: NSMenuItem) {
         guard let profile = sender.representedObject as? String else { return }
+        confirmSwitch(to: profile)
+    }
 
+    @objc private func switchProfileButton(_ sender: NSButton) {
+        guard let button = sender as? ProfileTabButton else { return }
+        confirmSwitch(to: button.profile)
+    }
+
+    private func confirmSwitch(to profile: String) {
+        statusItem.menu?.cancelTracking()
+
+        guard profile != activeProfile() else { return }
         let alert = NSAlert()
         alert.messageText = "Switch to \(profile)?"
         alert.informativeText = "Codex will quit, the saved account state will be restored, and Codex will reopen."
@@ -284,6 +783,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func captureCurrent() {
+        statusItem.menu?.cancelTracking()
+
         let alert = NSAlert()
         alert.messageText = "Capture Current Codex Account"
         alert.informativeText = "Codex will quit first so its login state is fully written. Use a short profile name, such as personal or work."
@@ -311,6 +812,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshNow() {
+        statusItem.menu?.cancelTracking()
         rebuildMenu()
         refreshUsage()
     }
@@ -422,11 +924,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func profileTitle(profile: String) -> String {
-        guard let snapshot = usageByProfile[profile], snapshot.error == nil else {
-            return "\(profile)  5h --  1w --"
+    private func profileTabItems(profiles: [String], activeProfile: String) -> [ProfileTabItem] {
+        profiles.map { profile in
+            ProfileTabItem(
+                profile: profile,
+                subtitle: profileSubtitle(profile),
+                isActive: profile == activeProfile
+            )
         }
-        return "\(profile)  5h \(formatPercent(snapshot.fiveHour?.remainingPercent))  1w \(formatPercent(snapshot.weekly?.remainingPercent))"
+    }
+
+    private func profileSubtitle(_ profile: String) -> String {
+        guard let snapshot = usageByProfile[profile], snapshot.error == nil else {
+            return "5h · --"
+        }
+        return "5h · \(formatPercent(snapshot.fiveHour?.remainingPercent))"
     }
 
     private func addUsageItems(to menu: NSMenu, snapshot: UsageSnapshot?) {
@@ -441,11 +953,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        addDisabled("5h remaining: \(formatPercent(snapshot.fiveHour?.remainingPercent))", to: menu)
-        addDisabled("5h resets: \(formatReset(snapshot.fiveHour?.resetAt))", to: menu)
-        addDisabled("1w remaining: \(formatPercent(snapshot.weekly?.remainingPercent))", to: menu)
-        addDisabled("1w resets: \(formatReset(snapshot.weekly?.resetAt))", to: menu)
-        addDisabled("Updated: \(formatDate(snapshot.fetchedAt))", to: menu)
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.view = UsageBarsMenuView(
+            rows: [
+                UsageBarRow(
+                    title: "5hour",
+                    usedPercent: snapshot.fiveHour?.usedPercent,
+                    resetText: formatResetDistance(snapshot.fiveHour?.resetAt)
+                ),
+                UsageBarRow(
+                    title: "Weekly",
+                    usedPercent: snapshot.weekly?.usedPercent,
+                    resetText: formatResetDistance(snapshot.weekly?.resetAt)
+                )
+            ],
+            updatedText: "Updated \(formatDate(snapshot.fetchedAt))",
+            target: self,
+            refreshAction: #selector(refreshNow)
+        )
+        menu.addItem(item)
     }
 
     private func addDisabled(_ title: String, to menu: NSMenu) {
@@ -478,9 +1004,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return "\(Int(value.rounded()))%"
     }
 
-    private func formatReset(_ epochSeconds: Double?) -> String {
-        guard let epochSeconds, epochSeconds.isFinite else { return "--" }
-        return formatDate(Date(timeIntervalSince1970: epochSeconds))
+    private func formatResetDistance(_ epochSeconds: Double?) -> String {
+        guard let epochSeconds, epochSeconds.isFinite else { return "Reset unavailable" }
+
+        let resetDate = Date(timeIntervalSince1970: epochSeconds)
+        let seconds = Int(resetDate.timeIntervalSinceNow.rounded())
+        guard seconds > 0 else { return "Resets soon" }
+
+        let days = seconds / 86_400
+        let hours = (seconds % 86_400) / 3_600
+        let minutes = (seconds % 3_600) / 60
+
+        if days > 0 {
+            return hours > 0 ? "Resets in \(days)d \(hours)h" : "Resets in \(days)d"
+        }
+
+        if hours > 0 {
+            return minutes > 0 ? "Resets in \(hours)h \(minutes)m" : "Resets in \(hours)h"
+        }
+
+        return "Resets in \(max(minutes, 1))m"
     }
 
     private func formatDate(_ date: Date) -> String {

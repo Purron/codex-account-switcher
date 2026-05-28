@@ -95,11 +95,12 @@ After launch, the menu bar item shows the switcher icon and the current profile'
 
 From the menu, you can:
 
-- Switch to a saved profile
-- View 5h and 1w remaining usage plus each reset time for every profile
-- Capture the current Codex account as a new profile
+- Switch accounts with profile cards
+- Add a new saved profile with the plus button
+- View 5-hour and weekly usage bars for the active profile
+- Refresh usage from the menu
 - Open the profile data folder
-- Open Codex
+- Quit the switcher
 
 ## Data Location
 
@@ -254,11 +255,12 @@ open "build/Codex Account Switcher.app"
 
 点击菜单栏图标可以：
 
-- 切换到已保存的 profile
-- 查看每个 profile 的 5 小时和 1 周剩余额度，以及各自 reset 时间
-- 捕获当前 Codex 账号为新 profile
+- 通过 profile 卡片切换账号
+- 点击加号保存新的 profile
+- 查看当前 profile 的 5 小时和 1 周用量进度条
+- 在菜单里刷新用量
 - 打开 profile 数据目录
-- 打开 Codex
+- 退出切换器
 
 ## 数据保存位置
 
