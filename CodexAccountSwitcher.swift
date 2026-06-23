@@ -9,15 +9,33 @@ struct CommandResult {
 struct AuthFile: Decodable {
     struct Tokens: Decodable {
         let accessToken: String?
+        let refreshToken: String?
+        let idToken: String?
         let accountId: String?
 
         enum CodingKeys: String, CodingKey {
             case accessToken = "access_token"
+            case refreshToken = "refresh_token"
+            case idToken = "id_token"
             case accountId = "account_id"
         }
     }
 
     let tokens: Tokens?
+}
+
+struct OAuthTokenResponse: Decodable {
+    let accessToken: String?
+    let refreshToken: String?
+    let idToken: String?
+    let accountId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case idToken = "id_token"
+        case accountId = "account_id"
+    }
 }
 
 struct LimitWindowResponse: Decodable {
@@ -525,6 +543,8 @@ private final class UsageBarsMenuView: NSView {
 
 final class UsageFetcher {
     private let endpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
+    private let tokenEndpoint = URL(string: "https://chatgpt.com/backend-api/oauth/token")!
+    private let codexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 
     func fetch(authURL: URL, completion: @escaping (UsageSnapshot) -> Void) {
         guard let auth = readAuth(authURL), let accessToken = auth.tokens?.accessToken else {
@@ -532,6 +552,16 @@ final class UsageFetcher {
             return
         }
 
+        fetchUsage(authURL: authURL, auth: auth, accessToken: accessToken, allowRefresh: true, completion: completion)
+    }
+
+    private func fetchUsage(
+        authURL: URL,
+        auth: AuthFile,
+        accessToken: String,
+        allowRefresh: Bool,
+        completion: @escaping (UsageSnapshot) -> Void
+    ) {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "GET"
         request.timeoutInterval = 15
@@ -555,6 +585,28 @@ final class UsageFetcher {
                 return
             }
 
+            if http.statusCode == 401, allowRefresh {
+                self.refreshAuth(authURL: authURL, auth: auth) { refreshedAuth in
+                    guard let refreshedAuth, let refreshedAccessToken = refreshedAuth.tokens?.accessToken else {
+                        completion(UsageSnapshot(fetchedAt: Date(), fiveHour: nil, weekly: nil, error: "Sign in again"))
+                        return
+                    }
+                    self.fetchUsage(
+                        authURL: authURL,
+                        auth: refreshedAuth,
+                        accessToken: refreshedAccessToken,
+                        allowRefresh: false,
+                        completion: completion
+                    )
+                }
+                return
+            }
+
+            if http.statusCode == 401 {
+                completion(UsageSnapshot(fetchedAt: Date(), fiveHour: nil, weekly: nil, error: "Sign in again"))
+                return
+            }
+
             guard http.statusCode == 200, let data else {
                 completion(UsageSnapshot(fetchedAt: Date(), fiveHour: nil, weekly: nil, error: "HTTP \(http.statusCode)"))
                 return
@@ -570,6 +622,96 @@ final class UsageFetcher {
                 completion(UsageSnapshot(fetchedAt: Date(), fiveHour: nil, weekly: nil, error: "Could not parse usage"))
             }
         }.resume()
+    }
+
+    private func refreshAuth(authURL: URL, auth: AuthFile, completion: @escaping (AuthFile?) -> Void) {
+        guard let refreshToken = auth.tokens?.refreshToken else {
+            completion(nil)
+            return
+        }
+
+        var request = URLRequest(url: tokenEndpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let params = [
+            "grant_type": "refresh_token",
+            "refresh_token": refreshToken,
+            "client_id": codexClientID
+        ]
+        request.httpBody = formBody(params)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard error == nil,
+                  let http = response as? HTTPURLResponse,
+                  http.statusCode == 200,
+                  let data,
+                  let refreshed = try? JSONDecoder().decode(OAuthTokenResponse.self, from: data),
+                  let accessToken = refreshed.accessToken else {
+                completion(nil)
+                return
+            }
+
+            let accountId = refreshed.accountId ?? self.accountIdFromJWT(accessToken) ?? auth.tokens?.accountId
+            guard self.writeRefreshedAuth(authURL: authURL, response: refreshed, accessToken: accessToken, accountId: accountId),
+                  let updatedAuth = self.readAuth(authURL) else {
+                completion(nil)
+                return
+            }
+
+            completion(updatedAuth)
+        }.resume()
+    }
+
+    private func formBody(_ params: [String: String]) -> Data {
+        let body = params
+            .map { key, value in "\(urlEncode(key))=\(urlEncode(value))" }
+            .joined(separator: "&")
+        return Data(body.utf8)
+    }
+
+    private func urlEncode(_ value: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
+    private func writeRefreshedAuth(
+        authURL: URL,
+        response: OAuthTokenResponse,
+        accessToken: String,
+        accountId: String?
+    ) -> Bool {
+        guard let data = try? Data(contentsOf: authURL),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+
+        var tokens = object["tokens"] as? [String: Any] ?? [:]
+        tokens["access_token"] = accessToken
+        if let refreshToken = response.refreshToken {
+            tokens["refresh_token"] = refreshToken
+        }
+        if let idToken = response.idToken {
+            tokens["id_token"] = idToken
+        }
+        if let accountId {
+            tokens["account_id"] = accountId
+        }
+
+        object["tokens"] = tokens
+        object["last_refresh"] = ISO8601DateFormatter().string(from: Date())
+
+        do {
+            let updated = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+            try updated.write(to: authURL, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: authURL.path)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func readAuth(_ url: URL) -> AuthFile? {
