@@ -2,89 +2,56 @@
 
 **English** | [简体中文](#简体中文)
 
-## Download
+A local-first macOS menu bar app for monitoring Codex and Claude activity, opening recent sessions, and switching between saved Codex accounts.
 
-**Latest macOS app:** [AgentStatusIndicator-v0.2.0-macOS.zip](https://github.com/Purron/agent-status-indicator/releases/download/v0.2.0/AgentStatusIndicator-v0.2.0-macOS.zip)
+The menu bar traffic lights make agent state visible at a glance:
 
-All downloads are available on the [GitHub Releases page](https://github.com/Purron/agent-status-indicator/releases).
+- Red: blocked or stale
+- Yellow: waiting for review or permission
+- Green: working or recently completed
+- Red and green: paused
+- Dimmed lights: idle
 
-> Note: the current build is not Apple notarized yet. On first launch, macOS may require opening it via right click -> Open or allowing it in Privacy & Security.
+## Release Status
+
+The current `main` branch contains the unreleased Agent Status Indicator redesign with Auto, Codex, and Claude status modes.
+
+The latest published binary is still the previous Codex-only release:
+
+- [Codex Account Switcher v0.2.0](https://github.com/Purron/codex-account-switcher/releases/download/v0.2.0/CodexAccountSwitcher-v0.2.0-macOS.zip)
+- [All GitHub releases](https://github.com/Purron/codex-account-switcher/releases)
+
+> The downloadable build is not Apple-notarized. On first launch, macOS may require right-clicking the app and choosing **Open**, or allowing it in **Privacy & Security**.
 
 ## Screenshot
 
 ![Agent Status Indicator menu screenshot](docs/screenshot-menu.png)
 
-A local-first macOS menu bar app for switching between multiple OpenAI Codex accounts.
-
-Agent Status Indicator saves the Codex CLI auth state and Codex Desktop app state for each profile. When you switch profiles, it quits Codex, restores the selected account state, and opens Codex again.
-
-It is useful when you regularly move between personal, work, or team Codex accounts.
-
 ## Features
 
-- Switch Codex accounts from the macOS menu bar
-- Capture the currently signed-in Codex account as a local profile
-- Save the active profile before switching away
-- Restore `~/.codex/auth.json` for Codex CLI
-- Restore `~/Library/Application Support/Codex` for Codex Desktop
-- Show each saved profile's 5h and 1w Codex usage remaining from the official Codex usage endpoint
-- Show current Codex project conversation status as menu bar traffic lights
-- Keep all profile data on your machine
+- Monitor local Codex and Claude sessions from the macOS menu bar
+- Use Auto mode to combine sessions from both services
+- Switch to Codex or Claude mode to inspect one service
+- Show recent sessions with service icons, project names, times, and current state
+- Open a recent session in its corresponding desktop app
+- Switch between locally saved Codex profiles
+- Capture the currently signed-in Codex account as a new profile
+- Save the active Codex profile before switching away
+- Restore Codex CLI and Codex Desktop authentication state
+- Show the active Codex profile's 5-hour and weekly usage
+- Refresh expired Codex access tokens when the usage endpoint returns an authorization error
+- Keep profiles and cached usage data on the local machine
 
-## Project Structure
-
-```text
-.
-├── AgentStatusIndicator.swift     # macOS menu bar app source
-├── agent-status-indicator.sh      # Account capture and switch script
-├── build-app.sh                   # Local build script
-├── resources/                     # App icons and Info.plist
-└── README.md
-```
+The bundled command-line script can also manage Claude profiles manually by setting `ACCOUNT_SERVICE=claude`. Claude account switching is not currently exposed in the menu bar profile UI.
 
 ## Requirements
 
-- macOS
-- OpenAI Codex Desktop App
-- Codex CLI, with at least one account already signed in
-- Swift compiler, usually provided by Xcode Command Line Tools
+- macOS 13 or later
+- Codex Desktop, Claude Desktop, or both
+- Codex CLI for Codex profile capture and switching
+- Xcode Command Line Tools when building from source
 
-This app does not read files owned by other apps. Usage display reads each saved profile's own Codex `auth.json`, calls Codex's official `https://chatgpt.com/backend-api/wham/usage` endpoint, and stores only a small cache under `~/Library/Application Support/AgentStatusIndicator/usage-cache.json`.
-
-## Quick Start
-
-Sign in to your first Codex account, then run:
-
-```bash
-./agent-status-indicator.sh capture personal
-```
-
-Sign out and sign in to your second Codex account, then run:
-
-```bash
-./agent-status-indicator.sh capture work
-```
-
-Switch between profiles:
-
-```bash
-./agent-status-indicator.sh switch personal
-./agent-status-indicator.sh switch work
-```
-
-List saved profiles:
-
-```bash
-./agent-status-indicator.sh list
-```
-
-Show the active profile:
-
-```bash
-./agent-status-indicator.sh active
-```
-
-## Build the Menu Bar App
+## Build From Source
 
 ```bash
 chmod +x build-app.sh agent-status-indicator.sh
@@ -92,27 +59,90 @@ chmod +x build-app.sh agent-status-indicator.sh
 open "build/Agent Status Indicator.app"
 ```
 
-After launch, the menu bar item shows traffic lights and a short status label for current Codex project activity.
+The app is written as a single native AppKit executable and does not require third-party build dependencies. The local build script does not sign or notarize the resulting app for distribution.
 
-From the menu, you can:
+## Using the Status Panel
 
-- Switch accounts with profile cards
-- Add a new saved profile with the plus button
-- Check whether Codex appears active, blocked, waiting for review, waiting for permission, stale, paused, completed, or idle
-- View 5-hour and weekly usage bars for the active profile
-- Refresh usage from the menu
-- Open the profile data folder
-- Quit the switcher
+The status panel has three modes:
 
-## Data Location
+- **Auto** combines Codex and Claude activity and highlights the most relevant current state.
+- **Codex** shows Codex sessions, saved Codex profiles, and available usage data.
+- **Claude** shows recent Claude sessions and opens them in Claude Desktop.
 
-Profiles are saved locally in:
+Session status is derived from local Codex/Claude session metadata and compatible Agent Signal state when available. Old activity is marked stale or removed from the active list according to its state and age.
+
+## Codex Profile Quick Start
+
+Sign in to the first Codex account, then capture it:
+
+```bash
+./agent-status-indicator.sh capture personal
+```
+
+Sign in to another account and capture it:
+
+```bash
+./agent-status-indicator.sh capture work
+```
+
+Switch profiles:
+
+```bash
+./agent-status-indicator.sh switch personal
+./agent-status-indicator.sh switch work
+```
+
+List profiles and show the active profile:
+
+```bash
+./agent-status-indicator.sh list
+./agent-status-indicator.sh active
+```
+
+## CLI Reference
+
+The default service is Codex:
+
+```text
+agent-status-indicator.sh capture <profile>
+agent-status-indicator.sh switch <profile> [--no-open]
+agent-status-indicator.sh delete <profile>
+agent-status-indicator.sh list [--plain]
+agent-status-indicator.sh active
+agent-status-indicator.sh open-folder
+```
+
+Select a service with `ACCOUNT_SERVICE`:
+
+```bash
+ACCOUNT_SERVICE=codex ./agent-status-indicator.sh list
+ACCOUNT_SERVICE=claude ./agent-status-indicator.sh list
+```
+
+Supported environment variables:
+
+```text
+AGENT_STATUS_INDICATOR_HOME  Profile storage directory
+ACCOUNT_SERVICE              codex or claude; defaults to codex
+
+CODEX_AUTH_FILE              Codex auth file; defaults to ~/.codex/auth.json
+CODEX_APP_SUPPORT            Codex Desktop state directory
+CODEX_APP_NAME               Codex macOS app name
+
+CLAUDE_AUTH_FILE             Claude auth file; defaults to ~/.claude.json
+CLAUDE_APP_SUPPORT           Claude Desktop state directory
+CLAUDE_APP_NAME              Claude macOS app name
+```
+
+## Local Data
+
+All profile data is stored under:
 
 ```text
 ~/Library/Application Support/AgentStatusIndicator
 ```
 
-Each profile uses this structure:
+Codex profiles use:
 
 ```text
 profiles/<name>/auth/auth.json
@@ -120,43 +150,35 @@ profiles/<name>/app-support/Codex
 profiles/<name>/profile.env
 ```
 
+Claude profiles created through the CLI use:
+
+```text
+services/claude/profiles/<name>/auth/claude.json
+services/claude/profiles/<name>/app-support/<Claude state directory>
+services/claude/profiles/<name>/profile.env
+```
+
+The app migrates data from the legacy `CodexAccountSwitcher` application-support directory when possible.
+
 ## Security Notes
 
-This tool only copies Codex auth and desktop state files on your local machine. It does not read, print, or upload token contents.
+Profile directories may contain authentication credentials, cookies, Local Storage, and desktop window state. Do not commit, upload, or share them.
 
-Be careful with profile data. `~/Library/Application Support/Codex` may contain cookies, Local Storage, window state, and other desktop app state. Do not commit profile data to GitHub or share it with anyone else.
+Account capture and switching copy these files only between local directories. Codex usage requests authenticate directly with OpenAI's usage endpoint; tokens are not sent to third parties.
 
-Codex Desktop must be restarted when switching accounts. Electron and Chromium auth state does not hot-reload while the app is running, so this tool quits Codex before capture and switch operations.
+Codex or Claude Desktop must be stopped while its state is captured or restored because Electron/Chromium authentication state does not hot-reload safely.
 
-## CLI Reference
-
-```text
-agent-status-indicator.sh capture <profile>
-agent-status-indicator.sh switch <profile> [--no-open]
-agent-status-indicator.sh list [--plain]
-agent-status-indicator.sh active
-agent-status-indicator.sh open-folder
-```
-
-Environment variables:
+## Project Structure
 
 ```text
-AGENT_STATUS_INDICATOR_HOME       Profile storage directory
-CODEX_AUTH_FILE     Codex CLI auth file, default ~/.codex/auth.json
-CODEX_APP_SUPPORT   Codex Desktop state directory, default ~/Library/Application Support/Codex
-CODEX_APP_NAME      macOS app name, default Codex
+.
+├── AgentStatusIndicator.swift     # Native macOS menu bar application
+├── agent-status-indicator.sh      # Codex/Claude profile management CLI
+├── build-app.sh                   # Local application bundle builder
+├── docs/                          # Documentation images
+├── resources/                     # App icons and Info.plist
+└── README.md
 ```
-
-## Recapturing Old Profiles
-
-If you captured profiles with an older version, sign in to each account again and capture it with the same profile name:
-
-```bash
-./agent-status-indicator.sh capture personal
-./agent-status-indicator.sh capture work
-```
-
-This keeps `auth.json` and Codex Desktop state in the latest format.
 
 ---
 
@@ -164,89 +186,56 @@ This keeps `auth.json` and Codex Desktop state in the latest format.
 
 [English](#agent-status-indicator) | **简体中文**
 
-## 下载
+Agent Status Indicator 是一个本地优先的 macOS 菜单栏工具，用来监控 Codex 和 Claude 的运行状态、打开最近会话，以及切换本地保存的 Codex 账号。
 
-**最新版 macOS App：** [AgentStatusIndicator-v0.2.0-macOS.zip](https://github.com/Purron/agent-status-indicator/releases/download/v0.2.0/AgentStatusIndicator-v0.2.0-macOS.zip)
+菜单栏红绿灯用于快速表达 Agent 状态：
 
-所有版本都可以在 [GitHub Releases 页面](https://github.com/Purron/agent-status-indicator/releases) 下载。
+- 红灯：阻塞或状态过期
+- 黄灯：等待查看或授权
+- 绿灯：工作中或最近已完成
+- 红绿灯同时亮：已暂停
+- 暗色灯：空闲
 
-> 注意：当前版本还没有经过 Apple notarize。首次打开时，macOS 可能需要你右键 App 选择 Open，或在 Privacy & Security 里允许打开。
+## 版本状态
+
+当前 `main` 分支是尚未发布的 Agent Status Indicator 重设计版本，已经包含 Auto、Codex 和 Claude 三种状态模式。
+
+目前公开下载的仍是旧版 Codex-only 构建：
+
+- [Codex Account Switcher v0.2.0](https://github.com/Purron/codex-account-switcher/releases/download/v0.2.0/CodexAccountSwitcher-v0.2.0-macOS.zip)
+- [全部 GitHub Releases](https://github.com/Purron/codex-account-switcher/releases)
+
+> 下载版尚未经过 Apple 公证。首次打开时，macOS 可能要求右键选择 **打开**，或在 **隐私与安全性** 中允许运行。
 
 ## 应用截图
 
 ![Agent Status Indicator 菜单截图](docs/screenshot-menu.png)
 
-一个本地优先的 macOS 菜单栏工具，用来在多个 OpenAI Codex 账号之间快速切换。
-
-Agent Status Indicator 会保存每个 profile 对应的 Codex CLI 登录态和 Codex Desktop 应用状态。切换 profile 时，它会自动退出 Codex、恢复目标账号状态，并重新打开 Codex。
-
-适合同时使用个人账号、工作账号或不同团队账号的场景。
-
 ## 功能特性
 
-- 从 macOS 菜单栏快速切换 Codex 账号
-- 捕获当前 Codex 登录态为本地 profile
-- 切换前自动保存当前 profile 的最新 Codex 状态
-- 恢复 Codex CLI 的 `~/.codex/auth.json`
-- 恢复 Codex Desktop 的 `~/Library/Application Support/Codex`
-- 通过 Codex 官方用量接口展示每个已保存 profile 的 5 小时和 1 周剩余额度
-- 在菜单栏用红绿灯展示当前 Codex 项目对话状态
-- 所有 profile 数据都保存在本机
+- 从 macOS 菜单栏监控本地 Codex 和 Claude 会话
+- 使用 Auto 模式合并查看两个服务的会话状态
+- 切换到 Codex 或 Claude 模式单独查看对应服务
+- 展示最近会话的服务图标、项目名、时间和当前状态
+- 在对应桌面 App 中打开最近会话
+- 切换本地保存的 Codex profile
+- 将当前 Codex 登录账号捕获为新的 profile
+- 切换前自动保存当前 Codex profile
+- 恢复 Codex CLI 与 Codex Desktop 的登录状态
+- 展示当前 Codex profile 的 5 小时和 1 周用量
+- 用量接口授权失败时尝试刷新 Codex access token
+- 所有 profile 和用量缓存都保存在本机
 
-## 项目结构
-
-```text
-.
-├── AgentStatusIndicator.swift     # macOS 菜单栏 App 源码
-├── agent-status-indicator.sh      # 账号捕获和切换脚本
-├── build-app.sh                   # 本地构建脚本
-├── resources/                     # App 图标和 Info.plist
-└── README.md
-```
+附带的命令行脚本也可以通过 `ACCOUNT_SERVICE=claude` 手动管理 Claude profile。目前菜单栏的账号管理界面尚未开放 Claude profile 切换。
 
 ## 系统要求
 
-- macOS
-- 已安装 OpenAI Codex Desktop App
-- 已安装 Codex CLI，并至少登录过一个账号
-- Swift 编译器，通常随 Xcode Command Line Tools 提供
+- macOS 13 或更高版本
+- Codex Desktop、Claude Desktop，或同时安装两者
+- 使用 Codex profile 捕获和切换功能时需要 Codex CLI
+- 从源码构建时需要 Xcode Command Line Tools
 
-本工具不会读取其他 App 的私有文件。用量展示只读取每个 profile 自己保存的 Codex `auth.json`，请求 Codex 官方的 `https://chatgpt.com/backend-api/wham/usage` 接口，并且只把剩余百分比、reset 时间和更新时间缓存到 `~/Library/Application Support/AgentStatusIndicator/usage-cache.json`。
-
-## 快速开始
-
-先登录第一个 Codex 账号，然后执行：
-
-```bash
-./agent-status-indicator.sh capture personal
-```
-
-再退出当前 Codex 账号并登录第二个账号，然后执行：
-
-```bash
-./agent-status-indicator.sh capture work
-```
-
-之后就可以在两个账号之间切换：
-
-```bash
-./agent-status-indicator.sh switch personal
-./agent-status-indicator.sh switch work
-```
-
-查看已保存 profile：
-
-```bash
-./agent-status-indicator.sh list
-```
-
-查看当前记录的 active profile：
-
-```bash
-./agent-status-indicator.sh active
-```
-
-## 构建菜单栏 App
+## 从源码构建
 
 ```bash
 chmod +x build-app.sh agent-status-indicator.sh
@@ -254,27 +243,90 @@ chmod +x build-app.sh agent-status-indicator.sh
 open "build/Agent Status Indicator.app"
 ```
 
-打开后，菜单栏会显示当前 Codex 项目状态红绿灯和简短状态文字。
+App 是单文件原生 AppKit 应用，不依赖第三方构建库。本地构建脚本不会对产物进行正式签名或 Apple 公证。
 
-点击菜单栏图标可以：
+## 使用状态面板
 
-- 通过 profile 卡片切换账号
-- 点击加号保存新的 profile
-- 查看 Codex 当前是否处于工作中、阻塞、需要查看、等待授权、状态过期、暂停、已完成或空闲状态
-- 查看当前 profile 的 5 小时和 1 周用量进度条
-- 在菜单里刷新用量
-- 打开 profile 数据目录
-- 退出切换器
+状态面板包含三种模式：
 
-## 数据保存位置
+- **Auto**：合并 Codex 和 Claude 活动，并突出显示当前最重要的状态。
+- **Codex**：显示 Codex 会话、本地保存的 Codex profile 和可用的用量数据。
+- **Claude**：显示最近的 Claude 会话，并可以在 Claude Desktop 中打开。
 
-profile 默认保存在：
+会话状态来自本地 Codex/Claude 会话元数据，以及存在时兼容的 Agent Signal 状态。旧活动会根据状态和时间被标记为过期，或从活动列表中移除。
+
+## Codex Profile 快速开始
+
+登录第一个 Codex 账号后捕获 profile：
+
+```bash
+./agent-status-indicator.sh capture personal
+```
+
+登录另一个账号后再次捕获：
+
+```bash
+./agent-status-indicator.sh capture work
+```
+
+切换 profile：
+
+```bash
+./agent-status-indicator.sh switch personal
+./agent-status-indicator.sh switch work
+```
+
+列出 profile 并查看当前 profile：
+
+```bash
+./agent-status-indicator.sh list
+./agent-status-indicator.sh active
+```
+
+## 脚本命令
+
+脚本默认操作 Codex：
+
+```text
+agent-status-indicator.sh capture <profile>
+agent-status-indicator.sh switch <profile> [--no-open]
+agent-status-indicator.sh delete <profile>
+agent-status-indicator.sh list [--plain]
+agent-status-indicator.sh active
+agent-status-indicator.sh open-folder
+```
+
+通过 `ACCOUNT_SERVICE` 选择服务：
+
+```bash
+ACCOUNT_SERVICE=codex ./agent-status-indicator.sh list
+ACCOUNT_SERVICE=claude ./agent-status-indicator.sh list
+```
+
+支持的环境变量：
+
+```text
+AGENT_STATUS_INDICATOR_HOME  Profile 存储目录
+ACCOUNT_SERVICE              codex 或 claude，默认为 codex
+
+CODEX_AUTH_FILE              Codex auth 文件，默认 ~/.codex/auth.json
+CODEX_APP_SUPPORT            Codex Desktop 状态目录
+CODEX_APP_NAME               Codex macOS App 名称
+
+CLAUDE_AUTH_FILE             Claude auth 文件，默认 ~/.claude.json
+CLAUDE_APP_SUPPORT           Claude Desktop 状态目录
+CLAUDE_APP_NAME              Claude macOS App 名称
+```
+
+## 本地数据
+
+所有 profile 数据都保存在：
 
 ```text
 ~/Library/Application Support/AgentStatusIndicator
 ```
 
-每个 profile 内部结构如下：
+Codex profile 结构：
 
 ```text
 profiles/<name>/auth/auth.json
@@ -282,40 +334,32 @@ profiles/<name>/app-support/Codex
 profiles/<name>/profile.env
 ```
 
+通过 CLI 创建的 Claude profile 结构：
+
+```text
+services/claude/profiles/<name>/auth/claude.json
+services/claude/profiles/<name>/app-support/<Claude 状态目录>
+services/claude/profiles/<name>/profile.env
+```
+
+App 会尽可能自动迁移旧 `CodexAccountSwitcher` 应用支持目录中的数据。
+
 ## 安全说明
 
-这个工具只在本机复制 Codex 的登录态文件和桌面端应用状态，不会读取、打印或上传 token 内容。
+profile 目录可能包含登录凭证、Cookie、Local Storage 和桌面窗口状态。请勿提交、上传或分享这些数据。
 
-需要注意的是，`~/Library/Application Support/Codex` 可能包含 Cookie、Local Storage、窗口状态等桌面端状态。请只在你信任的本机环境中使用，不要把 profile 数据目录提交到 GitHub 或发送给别人。
+账号捕获和切换只会在本机目录之间复制相关文件。Codex 用量请求会直接向 OpenAI 的用量接口发起认证；token 不会发送给第三方。
 
-切换已经打开的 Codex Desktop 时，必须退出并重启 Codex。Electron/Chromium 登录态不会在运行中热更新，所以本工具会在捕获和切换前主动退出 Codex。
+捕获或恢复状态时需要停止 Codex 或 Claude Desktop，因为 Electron/Chromium 登录态无法安全地热更新。
 
-## 脚本命令
-
-```text
-agent-status-indicator.sh capture <profile>
-agent-status-indicator.sh switch <profile> [--no-open]
-agent-status-indicator.sh list [--plain]
-agent-status-indicator.sh active
-agent-status-indicator.sh open-folder
-```
-
-支持的环境变量：
+## 项目结构
 
 ```text
-AGENT_STATUS_INDICATOR_HOME       Profile 存储目录
-CODEX_AUTH_FILE     Codex CLI auth 文件，默认 ~/.codex/auth.json
-CODEX_APP_SUPPORT   Codex Desktop 状态目录，默认 ~/Library/Application Support/Codex
-CODEX_APP_NAME      macOS App 名称，默认 Codex
+.
+├── AgentStatusIndicator.swift     # 原生 macOS 菜单栏 App
+├── agent-status-indicator.sh      # Codex/Claude profile 管理脚本
+├── build-app.sh                   # 本地 App Bundle 构建脚本
+├── docs/                          # 文档图片
+├── resources/                     # App 图标和 Info.plist
+└── README.md
 ```
-
-## 重新捕获旧 Profile
-
-如果你用旧版本捕获过 profile，建议重新登录每个账号后用同名 profile 捕获一次：
-
-```bash
-./agent-status-indicator.sh capture personal
-./agent-status-indicator.sh capture work
-```
-
-这样可以确保 `auth.json` 和 Codex Desktop 状态都是最新格式。
