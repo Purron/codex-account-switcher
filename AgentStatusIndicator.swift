@@ -174,7 +174,7 @@ private enum ServiceSelectionMode: Equatable {
     }
 }
 
-private enum ProjectConversationLamp: CaseIterable, Equatable {
+private enum ProjectConversationLamp: CaseIterable, Equatable, Hashable {
     case red
     case yellow
     case green
@@ -1379,14 +1379,14 @@ private final class ProjectConversationMonitor {
             let url = URL(fileURLWithPath: trimmedCWD)
             let project = url.lastPathComponent.isEmpty ? compactPath(trimmedCWD) : url.lastPathComponent
             return ProjectConversationMetadata(
-                item: ProjectConversationItem(service: .claude, title: displayTitle, subtitle: "Claude · \(project)"),
+                item: ProjectConversationItem(service: .claude, title: displayTitle, subtitle: project),
                 startedAt: startedAt
             )
         }
 
         let shortID = String(sessionID.prefix(18))
         return ProjectConversationMetadata(
-            item: ProjectConversationItem(service: .claude, title: displayTitle, subtitle: "Claude · \(shortID)"),
+            item: ProjectConversationItem(service: .claude, title: displayTitle, subtitle: shortID),
             startedAt: startedAt
         )
     }
@@ -1399,14 +1399,14 @@ private final class ProjectConversationMonitor {
             let url = URL(fileURLWithPath: trimmedCWD)
             let project = url.lastPathComponent.isEmpty ? compactPath(trimmedCWD) : url.lastPathComponent
             return ProjectConversationMetadata(
-                item: ProjectConversationItem(service: .codex, title: displayTitle, subtitle: "Codex · \(project)"),
+                item: ProjectConversationItem(service: .codex, title: displayTitle, subtitle: project),
                 startedAt: startedAt
             )
         }
 
         let shortID = String(sessionID.prefix(18))
         return ProjectConversationMetadata(
-            item: ProjectConversationItem(service: .codex, title: displayTitle, subtitle: "Codex · \(shortID)"),
+            item: ProjectConversationItem(service: .codex, title: displayTitle, subtitle: shortID),
             startedAt: startedAt
         )
     }
@@ -1895,6 +1895,14 @@ private func stringDate(_ value: String?) -> Date? {
     return formatter.date(from: value)
 }
 
+private func compactSessionTimeText(_ date: Date?) -> String? {
+    guard let date else { return nil }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "HH:mm"
+    return formatter.string(from: date)
+}
+
 private enum TrafficLightStatusIcon {
     static func image(for state: ProjectConversationState, tick: Int) -> NSImage {
         let size = NSSize(width: 44, height: 16)
@@ -1911,12 +1919,18 @@ private enum TrafficLightStatusIcon {
         return image
     }
 
-    static let menuBarSize = NSSize(width: 92, height: 24)
+    static let menuBarSize = NSSize(width: 68, height: 18)
+    static let idleMenuBarSize = NSSize(width: 46, height: 18)
 
-    // Menu-bar item: a dark rounded pill showing the selected service glyph
-    // on the left and the three status lamps on the right.
-    static func menuBarImage(service: AccountService, state: ProjectConversationState, tick: Int) -> NSImage {
-        let size = menuBarSize
+    static func menuBarSize(service: AccountService?) -> NSSize {
+        service == nil ? idleMenuBarSize : menuBarSize
+    }
+
+    // Menu-bar item from Figma node 2322:1411. Active-service state is
+    // 68x18 with a 2px gap between service glyph and traffic-light capsule;
+    // idle/no-active-conversation remains 46x18 without the service glyph.
+    static func menuBarImage(service: AccountService?, state: ProjectConversationState, tick: Int) -> NSImage {
+        let size = menuBarSize(service: service)
         let image = NSImage(size: size)
         image.lockFocus()
         defer { image.unlockFocus() }
@@ -1924,51 +1938,112 @@ private enum TrafficLightStatusIcon {
         NSColor.clear.setFill()
         NSRect(origin: .zero, size: size).fill()
 
-        // Single full-rounded capsule: service icon + divider + traffic lights.
-        let pill = NSRect(origin: .zero, size: size)
-        NSColor.black.setFill()
-        NSBezierPath(roundedRect: pill, xRadius: size.height / 2, yRadius: size.height / 2).fill()
+        drawMenuBarShell(size: size, service: service)
 
-        let iconRect = NSRect(x: 8, y: 6, width: 12, height: 12)
-        drawServiceGlyph(service: service, in: iconRect)
-
-        NSColor.white.withAlphaComponent(0.15).setStroke()
-        let divider = NSBezierPath()
-        divider.lineWidth = 1
-        divider.move(to: NSPoint(x: 28.5, y: 6))
-        divider.line(to: NSPoint(x: 28.5, y: 18))
-        divider.stroke()
-
-        drawMenuBarStateLights(for: state, tick: tick, in: NSRect(x: 36, y: 0, width: 48, height: 24))
+        if let service {
+            drawMenuBarServiceGlyph(service: service, in: NSRect(x: 4, y: 3, width: 12, height: 12))
+            cutOutMenuBarLampHoles(service: service)
+            drawMenuBarStateLights(for: state, tick: tick, service: service)
+        } else {
+            cutOutMenuBarLampHoles(service: nil)
+            drawMenuBarStateLights(for: state, tick: tick, service: nil)
+        }
 
         image.isTemplate = false
         return image
     }
 
-    private static func drawMenuBarStateLights(for state: ProjectConversationState, tick: Int, in rect: NSRect) {
-        let lamps: [(ProjectConversationLamp, NSColor, CGFloat)] = [
-            (.red, NSColor(calibratedRed: 240 / 255, green: 51 / 255, blue: 46 / 255, alpha: 1), 6),
-            (.yellow, NSColor(calibratedRed: 1, green: 188 / 255, blue: 32 / 255, alpha: 1), 24),
-            (.green, NSColor(calibratedRed: 7 / 255, green: 171 / 255, blue: 75 / 255, alpha: 1), 42)
+    private static func drawMenuBarShell(size: NSSize, service: AccountService?) {
+        let outerRect = NSRect(origin: .zero, size: size)
+        let innerRect = service == nil
+            ? outerRect.insetBy(dx: 2, dy: 2)
+            : NSRect(x: 20, y: 2, width: 46, height: 14)
+
+        NSColor.white.setFill()
+        NSBezierPath(roundedRect: innerRect, xRadius: innerRect.height / 2, yRadius: innerRect.height / 2).fill()
+
+        NSColor.white.withAlphaComponent(0.4).setStroke()
+        let strokePath = NSBezierPath(roundedRect: outerRect.insetBy(dx: 0.5, dy: 0.5), xRadius: size.height / 2, yRadius: size.height / 2)
+        strokePath.lineWidth = 1
+        strokePath.stroke()
+    }
+
+    private static func cutOutMenuBarLampHoles(service: AccountService?) {
+        for x in menuBarLampXPositions(service: service) {
+            fillMenuBarCutout(NSBezierPath(ovalIn: NSRect(x: x, y: 4, width: 10, height: 10)))
+        }
+    }
+
+    private static func fillMenuBarCutout(_ path: NSBezierPath) {
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current?.compositingOperation = .destinationOut
+        NSColor.black.setFill()
+        path.fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private static func drawMenuBarStateLights(for state: ProjectConversationState, tick: Int, service: AccountService?) {
+        let positions = menuBarLampXPositions(service: service)
+        let lamps: [(ProjectConversationLamp, CGFloat)] = [
+            (.red, positions[0]),
+            (.yellow, positions[1]),
+            (.green, positions[2])
         ]
 
-        for (lamp, color, centerX) in lamps {
+        for (lamp, x) in lamps {
             let intensity = lightIntensity(lamp, state: state, tick: tick)
-            let alpha = intensity > 0 ? max(0.32, intensity) : 0.18
-            color.withAlphaComponent(alpha).setFill()
-            NSBezierPath(ovalIn: NSRect(x: rect.minX + centerX - 6, y: rect.midY - 6, width: 12, height: 12)).fill()
+            let alpha = intensity > 0 ? max(0.4, intensity) : 0.4
+            drawMenuBarLamp(in: NSRect(x: x, y: 4, width: 10, height: 10), lamp: lamp, alpha: alpha)
         }
+    }
+
+    private static func drawMenuBarLamp(in rect: NSRect, lamp: ProjectConversationLamp, alpha: CGFloat) {
+        let colors = menuBarLampGradientColors(for: lamp, alpha: alpha)
+        let path = NSBezierPath(ovalIn: rect)
+        if let gradient = NSGradient(colors: colors) {
+            gradient.draw(in: path, angle: -55)
+        } else {
+            colors.first?.setFill()
+            path.fill()
+        }
+    }
+
+    private static func menuBarLampGradientColors(for lamp: ProjectConversationLamp, alpha: CGFloat) -> [NSColor] {
+        switch lamp {
+        case .red:
+            return [
+                NSColor(calibratedRed: 240 / 255, green: 51 / 255, blue: 46 / 255, alpha: alpha),
+                NSColor(calibratedRed: 213 / 255, green: 40 / 255, blue: 35 / 255, alpha: alpha)
+            ]
+        case .yellow:
+            return [
+                NSColor(calibratedRed: 1, green: 188 / 255, blue: 32 / 255, alpha: alpha),
+                NSColor(calibratedRed: 212 / 255, green: 156 / 255, blue: 25 / 255, alpha: alpha)
+            ]
+        case .green:
+            return [
+                NSColor(calibratedRed: 7 / 255, green: 171 / 255, blue: 75 / 255, alpha: alpha),
+                NSColor(calibratedRed: 1 / 255, green: 134 / 255, blue: 56 / 255, alpha: alpha)
+            ]
+        }
+    }
+
+    private static func drawMenuBarServiceGlyph(service: AccountService, in rect: NSRect) {
+        drawServiceGlyph(service: service, in: rect)
+    }
+
+    private static func menuBarLampXPositions(service: AccountService?) -> [CGFloat] {
+        service == nil ? [4, 18, 32] : [24, 38, 52]
     }
 
     private static func drawServiceGlyph(service: AccountService, in rect: NSRect) {
         let resourceName = service == .codex ? "CodexTabIcon" : "ClaudeTabIcon"
         if let url = Bundle.main.url(forResource: resourceName, withExtension: "svg"),
-           let svg = try? String(contentsOf: url, encoding: .utf8) {
-            let white = svg.replacingOccurrences(of: #"fill="black" fill-opacity="0.65""#, with: #"fill="white""#)
-            if let data = white.data(using: .utf8), let image = NSImage(data: data) {
-                image.draw(in: rect)
-                return
-            }
+           let svg = try? String(contentsOf: url, encoding: .utf8),
+           let data = svgReplacingFills(svg, with: NSColor.white).data(using: .utf8),
+           let image = NSImage(data: data) {
+            image.draw(in: aspectFitRect(for: image, in: rect), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            return
         }
         // Fallback dot glyph.
         NSColor.white.setFill()
@@ -5089,7 +5164,7 @@ private final class SessionRowButton: NSControl {
             )
         )
         drawText(
-            session.subtitle,
+            subtitleText(),
             in: NSRect(x: textX, y: 28, width: textWidth, height: 14),
             attributes: textAttributes(
                 font: .systemFont(ofSize: 11, weight: .medium),
@@ -5110,6 +5185,14 @@ private final class SessionRowButton: NSControl {
                 alignment: .right
             )
         )
+    }
+
+    private func subtitleText() -> String {
+        let base = session.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let time = compactSessionTimeText(session.updatedAt ?? session.startedAt) else {
+            return base
+        }
+        return base.isEmpty ? time : "\(base) · \(time)"
     }
 
     private func drawServiceIcon(in rect: NSRect, highlighted: Bool) {
@@ -5220,13 +5303,10 @@ private final class ProjectStatusMenuView: NSView {
     private let isExpanded: Bool
     private let showsServiceIcons: Bool
     private let presentationStyle: ProjectStatusPresentationStyle
-    private static let headerHeight: CGFloat = 18
-    private static let headerToBlockGap: CGFloat = 6
-    private static let blockPadding: CGFloat = 0
+    private static let headerHeight: CGFloat = 26
     private static let rowHeight: CGFloat = 52
     private static let rowGap: CGFloat = 0
-    private static let topPadding: CGFloat = 0
-    private static let bottomPadding: CGFloat = 0
+    private static let emptyHeight: CGFloat = 48
     private static let visibleSessionLimit = 3
 
     override var isFlipped: Bool { true }
@@ -5278,25 +5358,24 @@ private final class ProjectStatusMenuView: NSView {
             let blockRect = NSRect(x: MenuDesign.separatorX, y: contentTop, width: MenuDesign.separatorWidth, height: blockHeight)
             AppDesign.moduleBackground.setFill()
             NSBezierPath(roundedRect: blockRect, xRadius: MenuDesign.moduleCornerRadius, yRadius: MenuDesign.moduleCornerRadius).fill()
-            if presentationStyle == .compactList {
-                drawSystemSymbol(
-                    "bubble",
-                    in: NSRect(x: blockRect.minX + 12, y: blockRect.minY + 16, width: 18, height: 16),
-                    pointSize: 13,
-                    color: AppDesign.textPrimary
-                )
-                drawText(
-                    "No Recent Sessions",
-                    in: NSRect(x: blockRect.minX + 38, y: blockRect.minY + 16, width: blockRect.width - 50, height: 16),
-                    attributes: textAttributes(font: .systemFont(ofSize: 13, weight: .medium), color: AppDesign.textPrimary)
-                )
-            } else {
-                drawText(
-                    "No active sessions now",
-                    in: NSRect(x: blockRect.minX + 12, y: blockRect.minY + 16, width: blockRect.width - 24, height: 18),
-                    attributes: textAttributes(font: .systemFont(ofSize: 13, weight: .medium), color: AppDesign.textPrimary)
-                )
-            }
+            let emptyText = presentationStyle == .compactList ? "No Recent Sessions" : "No active sessions now"
+            let emptyFont = NSFont.systemFont(ofSize: 11, weight: .medium)
+            let emptyTextWidth = textWidth(emptyText, font: emptyFont)
+            let iconWidth: CGFloat = 15
+            let emptyGap: CGFloat = 8
+            let groupWidth = iconWidth + emptyGap + emptyTextWidth
+            let groupX = blockRect.minX + floor((blockRect.width - groupWidth) / 2)
+            drawSystemSymbol(
+                "bubble",
+                in: NSRect(x: groupX, y: blockRect.minY + 17, width: iconWidth, height: 14),
+                pointSize: 11,
+                color: AppDesign.textTertiary
+            )
+            drawText(
+                emptyText,
+                in: NSRect(x: groupX + iconWidth + emptyGap, y: blockRect.minY + 17, width: emptyTextWidth + 2, height: 14),
+                attributes: textAttributes(font: .systemFont(ofSize: 11, weight: .medium), color: AppDesign.textTertiary)
+            )
             return
         }
 
@@ -5304,6 +5383,11 @@ private final class ProjectStatusMenuView: NSView {
         AppDesign.moduleBackground.setFill()
         NSBezierPath(roundedRect: blockRect, xRadius: MenuDesign.moduleCornerRadius, yRadius: MenuDesign.moduleCornerRadius).fill()
 
+        drawText(
+            "Recent Sessions",
+            in: NSRect(x: blockRect.minX + 12, y: blockRect.minY + 9, width: blockRect.width - 24, height: 12),
+            attributes: textAttributes(font: .systemFont(ofSize: 10, weight: .bold), color: AppDesign.textSecondary)
+        )
     }
 
     private var visibleLimit: Int {
@@ -5343,7 +5427,7 @@ private final class ProjectStatusMenuView: NSView {
     }
 
     private func sessionRowFrame(at index: Int) -> NSRect {
-        let y = contentTop + CGFloat(index) * (Self.rowHeight + Self.rowGap)
+        let y = contentTop + Self.headerHeight + CGFloat(index) * (Self.rowHeight + Self.rowGap)
         return NSRect(x: MenuDesign.separatorX, y: y, width: MenuDesign.separatorWidth, height: Self.rowHeight)
     }
 
@@ -5367,11 +5451,11 @@ private final class ProjectStatusMenuView: NSView {
         presentationStyle: ProjectStatusPresentationStyle
     ) -> CGFloat {
         guard !snapshot.sessions.isEmpty else {
-            return presentationStyle == .compactList ? 48 : 40
+            return emptyHeight
         }
         let rowCount = min(snapshot.sessions.count, visibleSessionLimit)
         let rowGaps = CGFloat(max(rowCount - 1, 0)) * rowGap
-        return CGFloat(rowCount) * rowHeight + rowGaps
+        return headerHeight + CGFloat(rowCount) * rowHeight + rowGaps
     }
 
     private static func clipStyle(at index: Int, count: Int) -> SessionRowClipStyle {
@@ -6708,7 +6792,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isProjectSessionsExpanded = false
         rebuildMenu()
         if !isAutoMode, selectedService.supportsUsage {
-            refreshUsage()
+            refreshUsage(rebuildAtStart: false)
         }
     }
 
@@ -6924,7 +7008,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isAccountsExpanded = false
         rebuildMenu()
         if !isAutoMode, selectedService.supportsUsage {
-            refreshUsage()
+            refreshUsage(rebuildAtStart: false)
         }
     }
 
@@ -7276,7 +7360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         profile == activeProfile ? codexAuthURL : profileAuthURL(profile: profile, service: service)
     }
 
-    private func refreshUsage() {
+    private func refreshUsage(rebuildAtStart: Bool = true) {
         guard !isRefreshingUsage else { return }
         guard !isAutoMode else { return }
         guard selectedService.supportsUsage else { return }
@@ -7292,7 +7376,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         isRefreshingUsage = true
-        rebuildMenu()
+        if rebuildAtStart {
+            rebuildMenu()
+        }
 
         let group = DispatchGroup()
         var updated: [String: UsageSnapshot] = [:]
@@ -7521,9 +7607,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem.button else { return }
         let statusSnapshot = statusBarProjectSnapshot()
         let service = statusBarService(for: statusSnapshot)
+        let iconService = statusSnapshot.sessions.first?.service
         let activeProfile = service.supportsProfiles ? activeProfile(for: service) : ""
 
-        button.image = TrafficLightStatusIcon.menuBarImage(service: service, state: statusSnapshot.state, tick: animationTick)
+        statusItem.length = TrafficLightStatusIcon.menuBarSize(service: iconService).width
+        button.image = TrafficLightStatusIcon.menuBarImage(service: iconService, state: statusSnapshot.state, tick: animationTick)
         button.imagePosition = .imageLeft
         button.title = ""
 
@@ -7547,8 +7635,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateStatusBarIcon() {
         guard let button = statusItem.button else { return }
         let statusSnapshot = statusBarProjectSnapshot()
-        let service = statusBarService(for: statusSnapshot)
-        button.image = TrafficLightStatusIcon.menuBarImage(service: service, state: statusSnapshot.state, tick: animationTick)
+        let iconService = statusSnapshot.sessions.first?.service
+        statusItem.length = TrafficLightStatusIcon.menuBarSize(service: iconService).width
+        button.image = TrafficLightStatusIcon.menuBarImage(service: iconService, state: statusSnapshot.state, tick: animationTick)
         button.imagePosition = .imageLeft
         button.title = ""
     }
